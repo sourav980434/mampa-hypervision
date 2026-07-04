@@ -243,7 +243,7 @@ class VMService
         
         $macAddress = !empty($params['mac_address']) 
             ? htmlspecialchars($params['mac_address'], ENT_QUOTES) 
-            : '52:54:00:' . implode(':', str_split(str_shuffle('abcdef0123456789'), 2));
+            : '52:54:00:' . implode(':', str_split(substr(str_shuffle('abcdef0123456789'), 0, 6), 2));
 
         $vncPort = rand(5900, 6000);
         
