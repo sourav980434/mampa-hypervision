@@ -278,10 +278,13 @@ class LocalLibvirtDriver implements LibvirtDriver
                     $diskSizeGb = (int) $disk['size'] ?: 20;
                     
                     if ($diskSource && !file_exists($diskSource)) {
-                        $diskRes = $this->runCommand("qemu-img create -f qcow2 " . escapeshellarg($diskSource) . " " . $diskSizeGb . "G");
+                        $diskRes = $this->runCommand("sudo qemu-img create -f qcow2 " . escapeshellarg($diskSource) . " " . $diskSizeGb . "G");
                         if ($diskRes['exit_code'] !== 0) {
                             throw new \RuntimeException("Failed to create disk image for VM {$name}: " . $diskRes['error']);
                         }
+                        // Ensure libvirt-qemu has write access to the newly created disk image
+                        $this->runCommand("sudo chown libvirt-qemu:libvirt-qemu " . escapeshellarg($diskSource));
+                        $this->runCommand("sudo chmod 660 " . escapeshellarg($diskSource));
                     }
                 }
             }
