@@ -324,6 +324,9 @@ class LocalLibvirtDriver implements LibvirtDriver
             throw new \RuntimeException("VM defined but failed to retrieve UUID for {$name}: " . $resUuid['error']);
         }
 
+        \Illuminate\Support\Facades\Cache::forget("vm_uuid_by_name_{$name}");
+        \Illuminate\Support\Facades\Cache::forget("local_libvirt_vms_registry");
+
         return trim($resUuid['output']);
     }
 
@@ -335,6 +338,9 @@ class LocalLibvirtDriver implements LibvirtDriver
         if ($res['exit_code'] !== 0) {
             throw new \RuntimeException("Failed to undefine VM {$name}: " . $res['error']);
         }
+        
+        \Illuminate\Support\Facades\Cache::forget("vm_uuid_by_name_{$name}");
+        \Illuminate\Support\Facades\Cache::forget("local_libvirt_vms_registry");
     }
 
     /**
