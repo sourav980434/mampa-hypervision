@@ -394,15 +394,19 @@ class LocalLibvirtDriver implements LibvirtDriver
         // 2. Scan external /media mount directory for USB pen drives
         if (is_dir('/media')) {
             try {
-                $mediaUsers = array_diff(@scandir('/media') ?: [], ['.', '..']);
-                foreach ($mediaUsers as $user) {
-                    $userPath = '/media/' . $user;
-                    if (is_dir($userPath)) {
-                        $drives = array_diff(@scandir($userPath) ?: [], ['.', '..']);
-                        foreach ($drives as $drive) {
-                            $drivePath = $userPath . '/' . $drive;
-                            if (is_dir($drivePath)) {
-                                $this->scanDirectoryForISOs($drivePath, $isos);
+                $subDirs = array_diff(@scandir('/media') ?: [], ['.', '..']);
+                foreach ($subDirs as $subDir) {
+                    $subPath = '/media/' . $subDir;
+                    if (is_dir($subPath)) {
+                        // Scan this directory directly (e.g. /media/usb-sdb1)
+                        $this->scanDirectoryForISOs($subPath, $isos);
+                        
+                        // Also check 1 level down just in case it's /media/username/drivename
+                        $nestedDirs = array_diff(@scandir($subPath) ?: [], ['.', '..']);
+                        foreach ($nestedDirs as $nested) {
+                            $nestedPath = $subPath . '/' . $nested;
+                            if (is_dir($nestedPath)) {
+                                $this->scanDirectoryForISOs($nestedPath, $isos);
                             }
                         }
                     }
@@ -415,11 +419,21 @@ class LocalLibvirtDriver implements LibvirtDriver
         // 3. Scan external /mnt mount directory
         if (is_dir('/mnt')) {
             try {
-                $mntDirs = array_diff(@scandir('/mnt') ?: [], ['.', '..']);
-                foreach ($mntDirs as $dir) {
-                    $dirPath = '/mnt/' . $dir;
-                    if (is_dir($dirPath)) {
-                        $this->scanDirectoryForISOs($dirPath, $isos);
+                $subDirs = array_diff(@scandir('/mnt') ?: [], ['.', '..']);
+                foreach ($subDirs as $subDir) {
+                    $subPath = '/mnt/' . $subDir;
+                    if (is_dir($subPath)) {
+                        // Scan directly
+                        $this->scanDirectoryForISOs($subPath, $isos);
+                        
+                        // Check 1 level down
+                        $nestedDirs = array_diff(@scandir($subPath) ?: [], ['.', '..']);
+                        foreach ($nestedDirs as $nested) {
+                            $nestedPath = $subPath . '/' . $nested;
+                            if (is_dir($nestedPath)) {
+                                $this->scanDirectoryForISOs($nestedPath, $isos);
+                            }
+                        }
                     }
                 }
             } catch (\Exception $e) {
