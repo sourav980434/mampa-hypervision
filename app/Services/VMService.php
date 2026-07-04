@@ -6,6 +6,7 @@ use App\Drivers\Libvirt\LibvirtDriver;
 use App\Models\VmMetadata;
 use App\Models\ActivityLog;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class VMService
 {
