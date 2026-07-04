@@ -126,7 +126,7 @@ class VMController extends Controller
             'iso_volume' => 'nullable|string|max:100',
             'description' => 'nullable|string|max:255',
             'usb_controller' => 'boolean',
-            'usb_controller_model' => 'nullable|in:qemu-xhci,ich9-ehci1,piix3-uhci',
+            'usb_controller_model' => 'nullable|in:qemu-xhci,usb-ehci,ich9-ehci1,piix3-uhci',
             'start_after_created' => 'boolean'
         ]);
 
@@ -208,7 +208,7 @@ class VMController extends Controller
             'iso_volume' => 'nullable|string|max:100',
             'description' => 'nullable|string|max:255',
             'usb_controller' => 'boolean',
-            'usb_controller_model' => 'nullable|in:qemu-xhci,ich9-ehci1,piix3-uhci',
+            'usb_controller_model' => 'nullable|in:qemu-xhci,usb-ehci,ich9-ehci1,piix3-uhci',
         ]);
 
         $result = $this->vmService->updateVM($uuid, $validated);

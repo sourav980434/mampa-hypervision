@@ -897,7 +897,8 @@ const getStatusColor = (status) => {
                                 class="bg-[#111214] border border-[#2c2d30] rounded p-1.5 text-white focus:outline-none focus:border-[#e57300] text-xs"
                             >
                                 <option value="qemu-xhci">USB 3.0 (qemu-xhci - Win 10/11, Linux)</option>
-                                <option value="ich9-ehci1">USB 2.0 (ich9-ehci1 - Win 7/XP)</option>
+                                <option value="usb-ehci">USB 2.0 (usb-ehci - Standalone for Win 7/XP)</option>
+                                <option value="ich9-ehci1">USB 2.0 (ich9-ehci1 - Intel EHCI)</option>
                                 <option value="piix3-uhci">USB 1.1 (piix3-uhci - Legacy)</option>
                             </select>
                         </div>
