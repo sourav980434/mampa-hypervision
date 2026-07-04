@@ -246,7 +246,9 @@ class VMService
             ? htmlspecialchars($params['mac_address'], ENT_QUOTES) 
             : '52:54:00:' . implode(':', str_split(substr(str_shuffle('abcdef0123456789'), 0, 6), 2));
 
-        $vncPort = rand(5900, 6000);
+        $vncPort = !empty($params['vnc_port']) && (int)$params['vnc_port'] > 0
+            ? (int) $params['vnc_port']
+            : rand(5900, 6000);
         
         $bootXml = "";
         if ($bootType === 'uefi') {
@@ -390,6 +392,7 @@ XML;
         $params['uuid'] = $uuid;
         $params['name'] = $vm['name'];
         $params['mac_address'] = $vm['mac_address'] ?? '';
+        $params['vnc_port'] = $vm['vnc_port'] ?? null;
         
         try {
             $xmlDesc = $this->buildXMLDescriptor($params);
