@@ -273,10 +273,11 @@ class VMService
         }
 
         $description = htmlspecialchars($params['description'] ?? 'Created via Mampa Hypervisor VM Wizard.', ENT_QUOTES);
+        $uuidTag = !empty($params['uuid']) ? "\n  <uuid>" . htmlspecialchars($params['uuid'], ENT_QUOTES) . "</uuid>" : "";
 
         return <<<XML
 <domain type='kvm'>
-  <name>{$name}</name>
+  <name>{$name}</name>{$uuidTag}
   <description>{$description}</description>
   <memory unit='KiB'>{$memoryKb}</memory>
   <currentMemory unit='KiB'>{$memoryKb}</currentMemory>
@@ -316,6 +317,9 @@ XML;
      */
     public function createVM(array $params): string
     {
+        if (empty($params['uuid'])) {
+            $params['uuid'] = (string) \Illuminate\Support\Str::uuid();
+        }
         $xmlDesc = $this->buildXMLDescriptor($params);
         $uuid = $this->driver->createVMFromXML($xmlDesc);
 
@@ -382,9 +386,10 @@ XML;
         }
 
         // Keep existing name and mac
+        $params['uuid'] = $uuid;
         $params['name'] = $vm['name'];
         $params['mac_address'] = $vm['mac_address'] ?? '';
-
+        
         try {
             $xmlDesc = $this->buildXMLDescriptor($params);
             $this->driver->createVMFromXML($xmlDesc);
