@@ -1,6 +1,5 @@
 <script setup>
-useTemplateRef: false
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
 
 const page = usePage();
@@ -8,6 +7,14 @@ const user = computed(() => page.props.auth.user);
 const vms = computed(() => page.props.vms || []);
 
 const isTreeExpanded = ref(true);
+
+const flashSuccess = ref(page.props.flash?.success);
+const flashError = ref(page.props.flash?.error);
+
+watch(() => page.props.flash, (newFlash) => {
+    flashSuccess.value = newFlash?.success;
+    flashError.value = newFlash?.error;
+}, { deep: true });
 
 const getStatusColor = (status) => {
     switch (status) {
@@ -261,6 +268,16 @@ const getStatusText = (status) => {
                         <div class="text-xs text-gray-500 font-mono" id="current-time">
                             July 01, 2026 13:14:36
                         </div>
+                    </div>
+
+                    <!-- Flash messages banner -->
+                    <div v-if="flashSuccess" class="bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 p-3.5 rounded text-xs font-semibold flex items-center justify-between">
+                        <span>{{ flashSuccess }}</span>
+                        <button @click="flashSuccess = null" class="text-emerald-400 hover:text-emerald-300 font-extrabold text-base">&times;</button>
+                    </div>
+                    <div v-if="flashError" class="bg-rose-500/10 border border-rose-500/25 text-rose-400 p-3.5 rounded text-xs font-semibold flex items-center justify-between">
+                        <span>{{ flashError }}</span>
+                        <button @click="flashError = null" class="text-rose-400 hover:text-rose-300 font-extrabold text-base">&times;</button>
                     </div>
 
                     <!-- Main Dynamic Page Content slot -->
