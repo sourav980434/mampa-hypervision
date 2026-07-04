@@ -231,15 +231,58 @@ XML;
         // Simply parse name, vcpu, memory from basic XML parser to insert
         $xml = simplexml_load_string($xmlDesc);
         $name = (string) $xml->name;
-        $memoryKb = (int) $xml->memory;
         $vcpus = (int) $xml->vcpu;
+        $memoryKb = (int) $xml->memory;
         $uuid = Str::uuid()->toString();
-
+        
         $diskGb = 20;
         if (isset($xml->devices->disk)) {
             foreach ($xml->devices->disk as $disk) {
                 if ((string) $disk['device'] === 'disk' && isset($disk['size'])) {
                     $diskGb = (int) $disk['size'];
+                    break;
+                }
+            }
+        }
+
+        $bootType = isset($xml->os->loader) ? 'uefi' : 'bios';
+        $machineType = isset($xml->os->type['machine']) ? (string) $xml->os->type['machine'] : 'pc-q35-6.2';
+        
+        $diskBus = 'virtio';
+        if (isset($xml->devices->disk)) {
+            foreach ($xml->devices->disk as $disk) {
+                if ((string)$disk['device'] === 'disk' && isset($disk->target['bus'])) {
+                    $diskBus = (string) $disk->target['bus'];
+                    break;
+                }
+            }
+        }
+
+        $networkBridge = 'virbr0';
+        if (isset($xml->devices->interface)) {
+            foreach ($xml->devices->interface as $iface) {
+                if ((string)$iface['type'] === 'bridge' && isset($iface->source['bridge'])) {
+                    $networkBridge = (string) $iface->source['bridge'];
+                    break;
+                }
+            }
+        }
+
+        $networkModel = 'virtio';
+        if (isset($xml->devices->interface)) {
+            foreach ($xml->devices->interface as $iface) {
+                if (isset($iface->model['type'])) {
+                    $networkModel = (string) $iface->model['type'];
+                    break;
+                }
+            }
+        }
+
+        $usbController = false;
+        if (isset($xml->devices->controller)) {
+            foreach ($xml->devices->controller as $ctrl) {
+                if ((string)$ctrl['type'] === 'usb') {
+                    $usbController = true;
                     break;
                 }
             }
@@ -254,9 +297,15 @@ XML;
             'memory_mb' => round($memoryKb / 1024),
             'disk_gb' => $diskGb,
             'ip_address' => '192.168.122.' . rand(100, 250),
-            'mac_address' => '52:54:00:' . implode(':', str_split(str_shuffle('abcdef0123456789'), 2)),
+            'mac_address' => '52:54:00:' . implode(':', str_split(substr(str_shuffle('abcdef0123456789'), 0, 6), 2)),
             'vnc_port' => 5900 + count($vms) + 1,
             'description' => (string) $xml->description ?: 'Newly created virtual machine.',
+            'boot_type' => $bootType,
+            'machine_type' => $machineType,
+            'disk_bus' => $diskBus,
+            'network_bridge' => $networkBridge,
+            'network_model' => $networkModel,
+            'usb_controller' => $usbController,
         ];
 
         $this->saveStoredVMs($vms);

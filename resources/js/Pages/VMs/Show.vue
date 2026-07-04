@@ -1,13 +1,16 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link, useForm, router } from '@inertiajs/vue3';
-import { ref, onMounted, onUnmounted } from 'vue';
+import { Head, Link, useForm, router, usePage } from '@inertiajs/vue3';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 
 const props = defineProps({
     vm: Object,
     rdpMappings: Array,
     publishedApps: Array
 });
+
+const page = usePage();
+const user = computed(() => page.props.auth.user);
 
 const activeTab = ref('summary');
 
@@ -97,6 +100,66 @@ const submitMetadata = () => {
 
 // Controls Loading states
 const isActionLoading = ref(false);
+
+// Delete VM Action
+const handleDelete = () => {
+    if (user.value.role !== 'admin') {
+        alert("Unauthorized. Only administrators can delete virtual machines.");
+        return;
+    }
+
+    if (props.vm.status === 'running' || props.vm.status === 'paused') {
+        alert(`Cannot delete: VM '${props.vm.name}' is currently ${props.vm.status}. Please stop/kill the VM before deleting.`);
+        return;
+    }
+
+    if (confirm(`⚠️ DANGER: Are you sure you want to permanently delete VM '${props.vm.name}'?\nThis will undefine the VM and remove all associated configurations and database settings.`)) {
+        isActionLoading.value = true;
+        router.delete(`/vms/${props.vm.uuid}`, {
+            onFinish: () => {
+                isActionLoading.value = false;
+            }
+        });
+    }
+};
+
+// Edit VM Configuration Action
+const isEditModalOpen = ref(false);
+const editForm = useForm({
+    vcpus: props.vm.vcpus || 2,
+    memory_mb: props.vm.memory_mb || 4096,
+    disk_gb: props.vm.disk_gb || 32,
+    boot_type: props.vm.boot_type || 'bios',
+    machine_type: props.vm.machine_type || 'pc-q35-6.2',
+    disk_bus: props.vm.disk_bus || 'virtio',
+    network_bridge: props.vm.network_bridge || 'virbr0',
+    network_model: props.vm.network_model || 'virtio',
+    description: props.vm.description || '',
+    usb_controller: props.vm.usb_controller !== false,
+});
+
+const openEditModal = () => {
+    if (user.value.role !== 'admin') {
+        alert("Unauthorized. Only administrators can edit virtual machines.");
+        return;
+    }
+
+    if (props.vm.status === 'running' || props.vm.status === 'paused') {
+        alert(`Cannot edit: VM '${props.vm.name}' is currently ${props.vm.status}. Please stop the VM before editing hardware configuration.`);
+        return;
+    }
+
+    isEditModalOpen.value = true;
+};
+
+const submitEditForm = () => {
+    editForm.post(`/vms/${props.vm.uuid}/update`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            isEditModalOpen.value = false;
+        }
+    });
+};
 
 const activePlan = ref(null);
 const isPlanModalOpen = ref(false);
@@ -256,6 +319,32 @@ const getStatusColor = (status) => {
                     class="border border-gray-600 hover:border-white text-gray-300 hover:text-white font-sans text-xs px-3 py-1 rounded transition disabled:opacity-50"
                 >
                     Reboot
+                </button>
+
+                <!-- Edit Hardware -->
+                <button
+                    v-if="user.role === 'admin'"
+                    @click="openEditModal"
+                    :disabled="isActionLoading"
+                    class="border border-amber-600 hover:border-amber-400 text-amber-300 hover:text-amber-100 font-sans text-xs px-3 py-1.5 rounded transition disabled:opacity-50 flex items-center space-x-1"
+                >
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    <span>Edit Hardware</span>
+                </button>
+
+                <!-- Delete VM -->
+                <button
+                    v-if="user.role === 'admin'"
+                    @click="handleDelete"
+                    :disabled="isActionLoading"
+                    class="bg-rose-950 hover:bg-rose-900 border border-rose-800 text-rose-200 hover:text-white font-sans text-xs px-3 py-1.5 rounded transition disabled:opacity-50 flex items-center space-x-1"
+                >
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    <span>Delete VM</span>
                 </button>
             </div>
         </div>
@@ -628,6 +717,168 @@ const getStatusColor = (status) => {
                 </div>
             </div>
         </div>
+
+        <!-- Edit Hardware Modal -->
+        <div v-if="isEditModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 font-sans text-xs select-none">
+            <div class="bg-[#1c1d22] border border-[#2c2d30] shadow-2xl rounded max-w-lg w-full overflow-hidden">
+                <!-- Header -->
+                <div class="px-5 py-4 border-b border-[#2c2d30] bg-[#16171b] flex justify-between items-center text-left">
+                    <h3 class="font-bold text-gray-200 uppercase tracking-wider">Edit Hardware Configuration</h3>
+                    <button @click="isEditModalOpen = false" class="text-gray-400 hover:text-white font-bold text-base">&times;</button>
+                </div>
+                
+                <!-- Body -->
+                <form @submit.prevent="submitEditForm" class="p-5 space-y-4 text-left">
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- vCPUs -->
+                        <div class="space-y-1">
+                            <label class="block text-gray-400 font-semibold">vCPU Cores</label>
+                            <input
+                                v-model="editForm.vcpus"
+                                type="number"
+                                min="1"
+                                max="32"
+                                required
+                                class="w-full bg-[#111214] border border-[#2c2d30] rounded p-2 text-white font-mono focus:outline-none focus:border-[#e57300] text-xs"
+                            />
+                            <span v-if="editForm.errors.vcpus" class="text-rose-500 text-[10px]">{{ editForm.errors.vcpus }}</span>
+                        </div>
+
+                        <!-- Memory (MB) -->
+                        <div class="space-y-1">
+                            <label class="block text-gray-400 font-semibold">Memory (MB)</label>
+                            <input
+                                v-model="editForm.memory_mb"
+                                type="number"
+                                min="512"
+                                max="131072"
+                                step="512"
+                                required
+                                class="w-full bg-[#111214] border border-[#2c2d30] rounded p-2 text-white font-mono focus:outline-none focus:border-[#e57300] text-xs"
+                            />
+                            <span v-if="editForm.errors.memory_mb" class="text-rose-500 text-[10px]">{{ editForm.errors.memory_mb }}</span>
+                        </div>
+
+                        <!-- Disk GB -->
+                        <div class="space-y-1">
+                            <label class="block text-gray-400 font-semibold">Disk Size (GB)</label>
+                            <input
+                                v-model="editForm.disk_gb"
+                                type="number"
+                                min="5"
+                                max="2000"
+                                required
+                                class="w-full bg-[#111214] border border-[#2c2d30] rounded p-2 text-white font-mono focus:outline-none focus:border-[#e57300] text-xs"
+                            />
+                            <span v-if="editForm.errors.disk_gb" class="text-rose-500 text-[10px]">{{ editForm.errors.disk_gb }}</span>
+                        </div>
+
+                        <!-- Boot Type -->
+                        <div class="space-y-1">
+                            <label class="block text-gray-400 font-semibold">Boot Type (Firmware)</label>
+                            <select
+                                v-model="editForm.boot_type"
+                                class="w-full bg-[#111214] border border-[#2c2d30] rounded p-2 text-white focus:outline-none focus:border-[#e57300] text-xs"
+                            >
+                                <option value="bios">BIOS (Legacy)</option>
+                                <option value="uefi">UEFI (Modern OVMF)</option>
+                            </select>
+                            <span v-if="editForm.errors.boot_type" class="text-rose-500 text-[10px]">{{ editForm.errors.boot_type }}</span>
+                        </div>
+
+                        <!-- Machine Type -->
+                        <div class="space-y-1">
+                            <label class="block text-gray-400 font-semibold">Machine Type</label>
+                            <select
+                                v-model="editForm.machine_type"
+                                class="w-full bg-[#111214] border border-[#2c2d30] rounded p-2 text-white focus:outline-none focus:border-[#e57300] text-xs"
+                            >
+                                <option value="pc-q35-6.2">pc-q35-6.2 (Default Q35)</option>
+                                <option value="i440fx">i440fx (Legacy standard)</option>
+                            </select>
+                        </div>
+
+                        <!-- Disk Bus -->
+                        <div class="space-y-1">
+                            <label class="block text-gray-400 font-semibold">Disk Controller Bus</label>
+                            <select
+                                v-model="editForm.disk_bus"
+                                class="w-full bg-[#111214] border border-[#2c2d30] rounded p-2 text-white focus:outline-none focus:border-[#e57300] text-xs"
+                            >
+                                <option value="virtio">VirtIO (Fastest)</option>
+                                <option value="sata">SATA (Standard)</option>
+                                <option value="scsi">SCSI</option>
+                                <option value="ide">IDE</option>
+                            </select>
+                        </div>
+
+                        <!-- Network Bridge -->
+                        <div class="space-y-1">
+                            <label class="block text-gray-400 font-semibold">Network Bridge Device</label>
+                            <input
+                                v-model="editForm.network_bridge"
+                                type="text"
+                                required
+                                class="w-full bg-[#111214] border border-[#2c2d30] rounded p-2 text-white font-mono focus:outline-none focus:border-[#e57300] text-xs"
+                            />
+                        </div>
+
+                        <!-- Network Model -->
+                        <div class="space-y-1">
+                            <label class="block text-gray-400 font-semibold">Network Adapter Model</label>
+                            <select
+                                v-model="editForm.network_model"
+                                class="w-full bg-[#111214] border border-[#2c2d30] rounded p-2 text-white focus:outline-none focus:border-[#e57300] text-xs"
+                            >
+                                <option value="virtio">VirtIO (Paravirtualized)</option>
+                                <option value="e1000">Intel e1000</option>
+                                <option value="rtl8139">Realtek rtl8139</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Description -->
+                    <div class="space-y-1">
+                        <label class="block text-gray-400 font-semibold">VM Description</label>
+                        <textarea
+                            v-model="editForm.description"
+                            rows="2"
+                            class="w-full bg-[#111214] border border-[#2c2d30] rounded p-2 text-white focus:outline-none focus:border-[#e57300] text-xs"
+                        ></textarea>
+                    </div>
+
+                    <!-- USB Controller -->
+                    <div class="flex items-center space-x-2 pt-1">
+                        <input
+                            v-model="editForm.usb_controller"
+                            type="checkbox"
+                            id="edit_usb_controller"
+                            class="rounded bg-[#111214] border-[#2c2d30] text-[#e57300] focus:ring-[#e57300] focus:ring-opacity-50"
+                        />
+                        <label for="edit_usb_controller" class="text-gray-300 font-semibold cursor-pointer">Enable USB Controller</label>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="flex justify-end space-x-2 pt-3 border-t border-[#2c2d30] mt-4">
+                        <button
+                            type="button"
+                            @click="isEditModalOpen = false"
+                            class="px-3.5 py-1.5 rounded border border-[#2c2d30] text-gray-400 hover:text-white transition text-xs"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            :disabled="editForm.processing"
+                            class="bg-[#e57300] hover:bg-orange-600 text-black font-bold px-4 py-1.5 rounded transition text-xs disabled:opacity-50"
+                        >
+                            Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <!-- SVG Gradients definition for sparklines -->
         <svg class="absolute h-0 w-0" width="0" height="0">
             <defs>

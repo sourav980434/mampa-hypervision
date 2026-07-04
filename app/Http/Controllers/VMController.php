@@ -167,4 +167,53 @@ class VMController extends Controller
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
+
+    /**
+     * Delete/Undefine VM.
+     */
+    public function destroy(Request $request, string $uuid): RedirectResponse
+    {
+        if ($request->user()->role !== 'admin') {
+            return back()->with('error', 'Unauthorized. Only admins can delete VMs.');
+        }
+
+        $result = $this->vmService->deleteVM($uuid);
+
+        if (!$result['success']) {
+            return back()->with('error', $result['message']);
+        }
+
+        return redirect()->route('dashboard')->with('success', $result['message']);
+    }
+
+    /**
+     * Update VM configuration.
+     */
+    public function update(Request $request, string $uuid): RedirectResponse
+    {
+        if ($request->user()->role !== 'admin') {
+            return back()->with('error', 'Unauthorized. Only admins can edit VMs.');
+        }
+
+        $validated = $request->validate([
+            'vcpus' => 'required|integer|between:1,32',
+            'memory_mb' => 'required|integer|between:512,131072',
+            'disk_gb' => 'required|integer|between:5,2000',
+            'boot_type' => 'required|in:bios,uefi',
+            'machine_type' => 'required|in:pc-q35-6.2,i440fx',
+            'disk_bus' => 'required|in:virtio,sata,scsi,ide',
+            'network_bridge' => 'required|string|max:50',
+            'network_model' => 'required|in:virtio,e1000,rtl8139',
+            'description' => 'nullable|string|max:255',
+            'usb_controller' => 'boolean',
+        ]);
+
+        $result = $this->vmService->updateVM($uuid, $validated);
+
+        if (!$result['success']) {
+            return back()->with('error', $result['message']);
+        }
+
+        return back()->with('success', $result['message']);
+    }
 }

@@ -326,6 +326,90 @@ XML;
     }
 
     /**
+     * Delete/Undefine a virtual machine.
+     */
+    public function deleteVM(string $uuid): array
+    {
+        $vm = $this->getVMDetails($uuid);
+        if ($vm['status'] === 'running' || $vm['status'] === 'paused') {
+            return [
+                'success' => false,
+                'message' => "VM '{$vm['name']}' is currently {$vm['status']}. You must stop the VM before deleting it."
+            ];
+        }
+
+        try {
+            $this->driver->undefineVM($uuid);
+            
+            // Clean up DB metadata
+            \App\Models\VmMetadata::where('vm_uuid', $uuid)->delete();
+            \App\Models\RdpVncMapping::where('vm_uuid', $uuid)->delete();
+            \App\Models\PublishedApplication::where('vm_uuid', $uuid)->delete();
+
+            $this->logActivity('vm.delete', [
+                'uuid' => $uuid,
+                'name' => $vm['name']
+            ]);
+
+            return [
+                'success' => true,
+                'message' => "VM '{$vm['name']}' has been deleted successfully."
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => "Failed to delete VM: " . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Update VM configuration.
+     */
+    public function updateVM(string $uuid, array $params): array
+    {
+        $vm = $this->getVMDetails($uuid);
+        if ($vm['status'] === 'running' || $vm['status'] === 'paused') {
+            return [
+                'success' => false,
+                'message' => "VM '{$vm['name']}' is currently {$vm['status']}. You must stop the VM before editing it."
+            ];
+        }
+
+        // Keep existing name and mac
+        $params['name'] = $vm['name'];
+        $params['mac_address'] = $vm['mac_address'] ?? '';
+
+        try {
+            $xmlDesc = $this->buildXMLDescriptor($params);
+            $this->driver->createVMFromXML($xmlDesc);
+
+            // Update VM cache config if cached
+            Cache::put("vm_config_{$uuid}", [
+                'vcpus' => (int) $params['vcpus'],
+                'memory_mb' => (int) $params['memory_mb'],
+            ], 300);
+
+            $this->logActivity('vm.update', [
+                'uuid' => $uuid,
+                'name' => $vm['name'],
+                'vcpus' => $params['vcpus'],
+                'memory_mb' => $params['memory_mb'],
+            ]);
+
+            return [
+                'success' => true,
+                'message' => "VM '{$vm['name']}' configuration updated successfully."
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => "Failed to update VM configuration: " . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
      * Log user activity.
      */
     protected function logActivity(string $action, array $details): void

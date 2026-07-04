@@ -137,6 +137,12 @@ class LocalLibvirtDriver implements LibvirtDriver
             'mac_address' => $xmlData['mac_address'],
             'vnc_port' => $xmlData['vnc_port'],
             'description' => $xmlData['description'],
+            'boot_type' => $xmlData['boot_type'] ?? 'bios',
+            'machine_type' => $xmlData['machine_type'] ?? 'pc-q35-6.2',
+            'disk_bus' => $xmlData['disk_bus'] ?? 'virtio',
+            'network_bridge' => $xmlData['network_bridge'] ?? 'virbr0',
+            'network_model' => $xmlData['network_model'] ?? 'virtio',
+            'usb_controller' => $xmlData['usb_controller'] ?? false,
         ];
     }
 
@@ -538,6 +544,12 @@ class LocalLibvirtDriver implements LibvirtDriver
                 'vnc_port' => null,
                 'disk_gb' => 20,
                 'description' => '',
+                'boot_type' => 'bios',
+                'machine_type' => 'pc-q35-6.2',
+                'disk_bus' => 'virtio',
+                'network_bridge' => 'virbr0',
+                'network_model' => 'virtio',
+                'usb_controller' => false,
             ];
         }
 
@@ -563,11 +575,64 @@ class LocalLibvirtDriver implements LibvirtDriver
 
         $description = isset($xml->description) ? (string) $xml->description : '';
 
+        $bootType = isset($xml->os->loader) ? 'uefi' : 'bios';
+        
+        $machineType = 'pc-q35-6.2';
+        if (isset($xml->os->type['machine'])) {
+            $machineType = (string) $xml->os->type['machine'];
+        }
+
+        $diskBus = 'virtio';
+        if (isset($xml->devices->disk)) {
+            foreach ($xml->devices->disk as $disk) {
+                if ((string)$disk['device'] === 'disk' && isset($disk->target['bus'])) {
+                    $diskBus = (string) $disk->target['bus'];
+                    break;
+                }
+            }
+        }
+
+        $networkBridge = 'virbr0';
+        if (isset($xml->devices->interface)) {
+            foreach ($xml->devices->interface as $iface) {
+                if ((string)$iface['type'] === 'bridge' && isset($iface->source['bridge'])) {
+                    $networkBridge = (string) $iface->source['bridge'];
+                    break;
+                }
+            }
+        }
+
+        $networkModel = 'virtio';
+        if (isset($xml->devices->interface)) {
+            foreach ($xml->devices->interface as $iface) {
+                if (isset($iface->model['type'])) {
+                    $networkModel = (string) $iface->model['type'];
+                    break;
+                }
+            }
+        }
+
+        $usbController = false;
+        if (isset($xml->devices->controller)) {
+            foreach ($xml->devices->controller as $ctrl) {
+                if ((string)$ctrl['type'] === 'usb') {
+                    $usbController = true;
+                    break;
+                }
+            }
+        }
+
         return [
             'mac_address' => $mac,
             'vnc_port' => $vncPort,
             'disk_gb' => $diskGb,
             'description' => $description,
+            'boot_type' => $bootType,
+            'machine_type' => $machineType,
+            'disk_bus' => $diskBus,
+            'network_bridge' => $networkBridge,
+            'network_model' => $networkModel,
+            'usb_controller' => $usbController,
         ];
     }
 

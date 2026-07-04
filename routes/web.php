@@ -35,6 +35,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/vms/{uuid}/stats', [VMController::class, 'getStats'])->name('vms.stats');
     Route::get('/vms/{uuid}/execution-plan/{action}', [VMController::class, 'getExecutionPlan'])->name('vms.execution-plan');
     Route::post('/vms', [VMController::class, 'store'])->name('vms.store');
+    Route::delete('/vms/{uuid}', [VMController::class, 'destroy'])->name('vms.destroy');
+    Route::post('/vms/{uuid}/update', [VMController::class, 'update'])->name('vms.update');
     Route::get('/api/storage/pools', [StorageController::class, 'getPools'])->name('storage.pools');
     Route::get('/api/storage/isos', [StorageController::class, 'getISOs'])->name('storage.isos');
 
