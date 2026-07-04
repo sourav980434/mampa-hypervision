@@ -341,6 +341,239 @@ XML;
     }
 
     /**
+     * Get list of all USB block/storage partitions.
+     */
+    public function getStorageDevices(): array
+    {
+        if (env('LIBVIRT_DRIVER', 'local') === 'local') {
+            try {
+                $result = Process::run('lsblk -J -o NAME,FSTYPE,SIZE,MOUNTPOINT,LABEL,TRAN');
+                if ($result->exitCode() === 0) {
+                    return $this->parseLsblk($result->output());
+                }
+            } catch (\Exception $e) {
+                Log::warning("Failed to run lsblk: " . $e->getMessage() . ". Falling back to mock storage list.");
+            }
+        }
+
+        return $this->getMockStorageDevices();
+    }
+
+    /**
+     * Parse lsblk JSON output for USB partitions.
+     */
+    protected function parseLsblk(string $jsonOutput): array
+    {
+        $data = json_decode($jsonOutput, true);
+        if (!$data || !isset($data['blockdevices'])) {
+            return [];
+        }
+
+        $usbPartitions = [];
+        foreach ($data['blockdevices'] as $dev) {
+            $isUsb = (isset($dev['tran']) && strtolower($dev['tran']) === 'usb');
+            
+            // If it's a USB device, collect its partitions
+            if ($isUsb) {
+                if (isset($dev['children'])) {
+                    foreach ($dev['children'] as $child) {
+                        $usbPartitions[] = [
+                            'name' => $child['name'],
+                            'fstype' => $child['fstype'] ?? 'unknown',
+                            'size' => $child['size'] ?? 'unknown',
+                            'mountpoint' => $child['mountpoint'] ?? null,
+                            'label' => $child['label'] ?? 'USB Partition',
+                            'device_path' => '/dev/' . $child['name'],
+                        ];
+                    }
+                } else {
+                    // No children, the device itself might be formatted
+                    $usbPartitions[] = [
+                        'name' => $dev['name'],
+                        'fstype' => $dev['fstype'] ?? 'unknown',
+                        'size' => $dev['size'] ?? 'unknown',
+                        'mountpoint' => $dev['mountpoint'] ?? null,
+                        'label' => $dev['label'] ?? 'USB Disk',
+                        'device_path' => '/dev/' . $dev['name'],
+                    ];
+                }
+            }
+        }
+
+        return $usbPartitions;
+    }
+
+    /**
+     * Get mock storage devices for development.
+     */
+    protected function getMockStorageDevices(): array
+    {
+        return Cache::get('mock_storage_devices', [
+            [
+                'name' => 'sdb1',
+                'fstype' => 'vfat',
+                'size' => '14.8G',
+                'mountpoint' => null,
+                'label' => 'KINGSTON_16G',
+                'device_path' => '/dev/sdb1',
+            ],
+            [
+                'name' => 'sdc1',
+                'fstype' => 'ext4',
+                'size' => '29.8G',
+                'mountpoint' => '/media/root/TOSHIBA_USB',
+                'label' => 'TOSHIBA_USB',
+                'device_path' => '/dev/sdc1',
+            ]
+        ]);
+    }
+
+    /**
+     * Mount a USB storage partition.
+     */
+    public function mountStorage(string $deviceName): array
+    {
+        $this->checkSafetyMode();
+
+        if (!preg_match('/^[a-zA-Z0-9]+$/', $deviceName)) {
+            return [
+                'success' => false,
+                'message' => 'Invalid device name format.'
+            ];
+        }
+
+        $driver = env('LIBVIRT_DRIVER', 'mock');
+        if ($driver === 'mock') {
+            $devices = $this->getMockStorageDevices();
+            foreach ($devices as &$dev) {
+                if ($dev['name'] === $deviceName) {
+                    $dev['mountpoint'] = "/media/root/{$dev['label']}";
+                }
+            }
+            Cache::forever('mock_storage_devices', $devices);
+
+            $this->logActivity('usb.mount', [
+                'device' => $deviceName,
+                'mountpoint' => "/media/root/{$deviceName}",
+            ]);
+
+            return [
+                'success' => true,
+                'message' => "USB partition '{$deviceName}' successfully mounted (Mock Mode)."
+            ];
+        }
+
+        // Real mount on Ubuntu host
+        try {
+            $mountFolder = "/media/usb-{$deviceName}";
+            
+            // Create folder
+            if (!is_dir($mountFolder)) {
+                $mkdirResult = Process::run("sudo mkdir -p {$mountFolder}");
+                if ($mkdirResult->exitCode() !== 0) {
+                    return [
+                        'success' => false,
+                        'message' => "Failed to create mount directory: " . $mkdirResult->errorOutput()
+                    ];
+                }
+            }
+
+            // Mount partition
+            $mountResult = Process::run("sudo mount /dev/{$deviceName} {$mountFolder}");
+            if ($mountResult->exitCode() !== 0) {
+                return [
+                    'success' => false,
+                    'message' => "Failed to mount partition: " . $mountResult->errorOutput()
+                ];
+            }
+
+            // Grant read/write permissions
+            Process::run("sudo chmod 755 {$mountFolder}");
+
+            $this->logActivity('usb.mount', [
+                'device' => $deviceName,
+                'mountpoint' => $mountFolder,
+            ]);
+
+            return [
+                'success' => true,
+                'message' => "USB partition '{$deviceName}' successfully mounted at '{$mountFolder}'."
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => "Mount error: " . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Unmount a USB storage partition.
+     */
+    public function unmountStorage(string $deviceName): array
+    {
+        $this->checkSafetyMode();
+
+        if (!preg_match('/^[a-zA-Z0-9]+$/', $deviceName)) {
+            return [
+                'success' => false,
+                'message' => 'Invalid device name format.'
+            ];
+        }
+
+        $driver = env('LIBVIRT_DRIVER', 'mock');
+        if ($driver === 'mock') {
+            $devices = $this->getMockStorageDevices();
+            foreach ($devices as &$dev) {
+                if ($dev['name'] === $deviceName) {
+                    $dev['mountpoint'] = null;
+                }
+            }
+            Cache::forever('mock_storage_devices', $devices);
+
+            $this->logActivity('usb.unmount', [
+                'device' => $deviceName,
+            ]);
+
+            return [
+                'success' => true,
+                'message' => "USB partition '{$deviceName}' successfully unmounted (Mock Mode)."
+            ];
+        }
+
+        // Real unmount on Ubuntu host
+        try {
+            $unmountResult = Process::run("sudo umount /dev/{$deviceName}");
+            if ($unmountResult->exitCode() !== 0) {
+                return [
+                    'success' => false,
+                    'message' => "Failed to unmount partition: " . $unmountResult->errorOutput()
+                ];
+            }
+
+            // Clean up the folder
+            $mountFolder = "/media/usb-{$deviceName}";
+            if (is_dir($mountFolder)) {
+                Process::run("sudo rmdir {$mountFolder}");
+            }
+
+            $this->logActivity('usb.unmount', [
+                'device' => $deviceName,
+            ]);
+
+            return [
+                'success' => true,
+                'message' => "USB partition '{$deviceName}' successfully unmounted."
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => "Unmount error: " . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
      * Check if safety mode blocks this command.
      */
     protected function checkSafetyMode(): void

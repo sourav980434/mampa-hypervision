@@ -56,6 +56,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/api/usb/attached', [USBController::class, 'getAttached'])->name('api.usb.attached');
     Route::post('/api/usb/attach', [USBController::class, 'attach'])->name('api.usb.attach');
     Route::post('/api/usb/detach', [USBController::class, 'detach'])->name('api.usb.detach');
+    Route::get('/api/usb/storage', [USBController::class, 'getStorage'])->name('api.usb.storage');
+    Route::post('/api/usb/storage/mount', [USBController::class, 'mount'])->name('api.usb.mount');
+    Route::post('/api/usb/storage/unmount', [USBController::class, 'unmount'])->name('api.usb.unmount');
 
     // Profile Settings
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

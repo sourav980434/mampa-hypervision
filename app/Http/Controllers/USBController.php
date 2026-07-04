@@ -141,4 +141,87 @@ class USBController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get list of USB storage partitions on host.
+     */
+    public function getStorage(): JsonResponse
+    {
+        try {
+            $devices = $this->usbService->getStorageDevices();
+            return response()->json($devices);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Mount a USB storage partition.
+     */
+    public function mount(Request $request): JsonResponse
+    {
+        if ($request->user()->role !== 'admin') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Only admin users can mount USB partitions.'
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'device' => 'required|string',
+        ]);
+
+        try {
+            $result = $this->usbService->mountStorage($validated['device']);
+            if (!$result['success']) {
+                return response()->json($result, 400);
+            }
+            return response()->json($result);
+        } catch (\App\Exceptions\DestructiveCommandBlockedException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 403);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Unmount a USB storage partition.
+     */
+    public function unmount(Request $request): JsonResponse
+    {
+        if ($request->user()->role !== 'admin') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Only admin users can unmount USB partitions.'
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'device' => 'required|string',
+        ]);
+
+        try {
+            $result = $this->usbService->unmountStorage($validated['device']);
+            if (!$result['success']) {
+                return response()->json($result, 400);
+            }
+            return response()->json($result);
+        } catch (\App\Exceptions\DestructiveCommandBlockedException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 403);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

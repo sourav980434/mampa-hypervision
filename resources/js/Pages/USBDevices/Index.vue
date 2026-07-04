@@ -20,6 +20,12 @@ const isLoading = ref(true);
 const isActionLoading = ref({});
 const toasts = ref([]);
 
+// USB Storage states
+const activeTab = ref('passthrough');
+const storageDevices = ref([]);
+const isStorageLoading = ref(true);
+const isStorageActionLoading = ref({});
+
 // Modal state
 const isAttachModalOpen = ref(false);
 const selectedDevice = ref(null);
@@ -65,9 +71,26 @@ const fetchAttachedState = async () => {
     }
 };
 
+// Fetch all USB storage devices/partitions
+const fetchStorageDevices = async (showLoading = false) => {
+    if (showLoading) isStorageLoading.value = true;
+    try {
+        const response = await axios.get('/api/usb/storage');
+        storageDevices.value = response.data;
+    } catch (e) {
+        console.error("Failed to fetch USB storage devices", e);
+    } finally {
+        if (showLoading) isStorageLoading.value = false;
+    }
+};
+
 // Polling data refresh
 const refreshData = async () => {
-    await Promise.all([fetchDevices(false), fetchAttachedState()]);
+    await Promise.all([
+        fetchDevices(false),
+        fetchAttachedState(),
+        fetchStorageDevices(false)
+    ]);
 };
 
 // Hotplug alerts
@@ -180,9 +203,65 @@ const handleDetach = async (device) => {
     }
 };
 
+// Handle mount storage command
+const handleMount = async (device) => {
+    if (user.value.role !== 'admin') return;
+    const name = device.name;
+    isStorageActionLoading.value[name] = true;
+
+    try {
+        const response = await axios.post('/api/usb/storage/mount', {
+            device: name
+        });
+
+        const result = response.data;
+        if (result.success) {
+            addToast(result.message || 'USB partition mounted successfully.', 'success');
+            await fetchStorageDevices();
+        } else {
+            addToast(result.message || 'Failed to mount partition.', 'error');
+        }
+    } catch (e) {
+        const errorMsg = e.response?.data?.message || 'Network error during mounting.';
+        addToast(errorMsg, 'error');
+    } finally {
+        delete isStorageActionLoading.value[name];
+    }
+};
+
+// Handle unmount storage command
+const handleUnmount = async (device) => {
+    if (user.value.role !== 'admin') return;
+    const name = device.name;
+    isStorageActionLoading.value[name] = true;
+
+    try {
+        const response = await axios.post('/api/usb/storage/unmount', {
+            device: name
+        });
+
+        const result = response.data;
+        if (result.success) {
+            addToast(result.message || 'USB partition unmounted successfully.', 'success');
+            await fetchStorageDevices();
+        } else {
+            addToast(result.message || 'Failed to unmount partition.', 'error');
+        }
+    } catch (e) {
+        const errorMsg = e.response?.data?.message || 'Network error during unmounting.';
+        addToast(errorMsg, 'error');
+    } finally {
+        delete isStorageActionLoading.value[name];
+    }
+};
+
 // Lifecycle Hooks
 onMounted(async () => {
-    await Promise.all([fetchDevices(true), fetchAttachedState()]);
+    await Promise.all([
+        fetchDevices(true),
+        fetchAttachedState(),
+        fetchStorageDevices(true)
+    ]);
     
     // Auto-refresh every 5 seconds
     refreshInterval = setInterval(refreshData, 5000);
@@ -201,8 +280,26 @@ onUnmounted(() => {
     <AuthenticatedLayout>
         <template #breadcrumb>USB Device Management</template>
 
-        <!-- Main Panel Header -->
-        <div class="bg-[#1c1d22] border border-[#2c2d30] rounded">
+        <!-- Tab Selector -->
+        <div class="flex space-x-1 mb-4 select-none">
+            <button 
+                @click="activeTab = 'passthrough'"
+                class="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider rounded border transition duration-150"
+                :class="activeTab === 'passthrough' ? 'bg-[#e57300] text-black border-[#e57300]' : 'bg-[#1c1d22] text-gray-400 border-[#2c2d30] hover:text-white'"
+            >
+                USB Passthrough (VM Assignment)
+            </button>
+            <button 
+                @click="activeTab = 'storage'"
+                class="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider rounded border transition duration-150"
+                :class="activeTab === 'storage' ? 'bg-[#e57300] text-black border-[#e57300]' : 'bg-[#1c1d22] text-gray-400 border-[#2c2d30] hover:text-white'"
+            >
+                USB Disk Mount Manager (ISOs / Storage)
+            </button>
+        </div>
+
+        <!-- USB Passthrough Tab -->
+        <div v-show="activeTab === 'passthrough'" class="bg-[#1c1d22] border border-[#2c2d30] rounded">
             <div class="px-4 py-3 border-b border-[#2c2d30] bg-[#16171b] flex items-center justify-between select-none">
                 <div class="flex items-center space-x-2">
                     <h3 class="text-xs font-bold uppercase tracking-wider text-gray-300">Physical Host USB Devices</h3>
@@ -323,6 +420,128 @@ onUnmounted(() => {
             <div class="p-3 bg-[#16171b] border-t border-[#2c2d30] text-[10px] text-gray-500 font-sans flex justify-between items-center select-none">
                 <span>Security Notice: Attachments require VM authorization. Only administrators can perform device mapping.</span>
                 <span class="font-mono">Driver: LocalLibvirtDriver (lsusb helper)</span>
+            </div>
+        </div>
+
+        <!-- USB Disk Mount Manager Tab -->
+        <div v-show="activeTab === 'storage'" class="bg-[#1c1d22] border border-[#2c2d30] rounded">
+            <div class="px-4 py-3 border-b border-[#2c2d30] bg-[#16171b] flex items-center justify-between select-none">
+                <div class="flex items-center space-x-2">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-gray-300">USB Storage Partitions</h3>
+                    <span class="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 px-1.5 py-0.5 rounded font-mono font-bold">
+                        AUTO DETECTION
+                    </span>
+                </div>
+                <div class="flex items-center space-x-2 font-mono text-[10px] text-gray-500">
+                    <span class="relative flex h-1.5 w-1.5">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                    </span>
+                    <span>Auto-refresh active (5s)</span>
+                </div>
+            </div>
+
+            <!-- Storage Partitions Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr class="border-b border-[#2c2d30] text-gray-400 bg-black/20 select-none">
+                            <th class="p-3 font-semibold w-16">Status</th>
+                            <th class="p-3 font-semibold">Partition</th>
+                            <th class="p-3 font-semibold">Label</th>
+                            <th class="p-3 font-semibold">Format</th>
+                            <th class="p-3 font-semibold">Size</th>
+                            <th class="p-3 font-semibold">Mountpoint / Access Path</th>
+                            <th class="p-3 font-semibold text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-[#2c2d30] font-mono">
+                        <tr v-if="isStorageLoading">
+                            <td colspan="7" class="p-8 text-center text-gray-400 font-sans">
+                                <svg class="animate-spin h-5 w-5 mx-auto mb-2 text-[#e57300]" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Scanning USB ports for block devices...
+                            </td>
+                        </tr>
+                        
+                        <tr v-else-if="storageDevices.length === 0">
+                            <td colspan="7" class="p-8 text-center text-gray-500 italic font-sans">
+                                No USB storage drives or partitions detected on host.
+                            </td>
+                        </tr>
+
+                        <tr v-else v-for="dev in storageDevices" :key="dev.name" class="hover:bg-[#25262c]/20 transition animate-fadeIn">
+                            <!-- Status -->
+                            <td class="p-3 text-center">
+                                <span class="flex items-center justify-center">
+                                    <span 
+                                        class="h-2 w-2 rounded-full"
+                                        :class="dev.mountpoint ? 'bg-emerald-500 animate-pulse' : 'bg-gray-500'"
+                                        :title="dev.mountpoint ? 'Mounted' : 'Unmounted'"
+                                    ></span>
+                                </span>
+                            </td>
+
+                            <!-- Partition Name -->
+                            <td class="p-3 font-semibold text-white">
+                                {{ dev.name }}
+                            </td>
+
+                            <!-- Label -->
+                            <td class="p-3 text-gray-300 font-sans">
+                                {{ dev.label || 'USB Drive' }}
+                            </td>
+
+                            <!-- Format -->
+                            <td class="p-3 text-gray-400">
+                                {{ dev.fstype }}
+                            </td>
+
+                            <!-- Size -->
+                            <td class="p-3 text-gray-300">
+                                {{ dev.size }}
+                            </td>
+
+                            <!-- Mountpoint -->
+                            <td class="p-3">
+                                <span v-if="dev.mountpoint" class="text-emerald-400 font-mono text-[11px]">
+                                    {{ dev.mountpoint }}
+                                </span>
+                                <span v-else class="text-gray-500 italic font-sans text-[11px]">
+                                    Not mounted (No active ISO scanning)
+                                </span>
+                            </td>
+
+                            <!-- Action -->
+                            <td class="p-3 text-right">
+                                <button
+                                    v-if="dev.mountpoint"
+                                    @click="handleUnmount(dev)"
+                                    :disabled="user.role !== 'admin' || isStorageActionLoading[dev.name]"
+                                    class="bg-rose-950/40 hover:bg-rose-900 border border-rose-900/40 hover:border-rose-700/60 text-rose-300 font-sans text-[10px] px-3.5 py-1.5 rounded transition disabled:opacity-30 disabled:cursor-not-allowed select-none"
+                                >
+                                    {{ isStorageActionLoading[dev.name] ? 'Unmounting...' : 'Unmount' }}
+                                </button>
+                                <button
+                                    v-else
+                                    @click="handleMount(dev)"
+                                    :disabled="user.role !== 'admin' || isStorageActionLoading[dev.name]"
+                                    class="bg-[#e57300] hover:bg-orange-600 text-black font-bold font-sans text-[10px] px-4 py-1.5 rounded transition disabled:opacity-30 disabled:cursor-not-allowed select-none"
+                                >
+                                    {{ isStorageActionLoading[dev.name] ? 'Mounting...' : 'Mount Disk' }}
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Footer Details -->
+            <div class="p-3 bg-[#16171b] border-t border-[#2c2d30] text-[10px] text-gray-500 font-sans flex justify-between items-center select-none">
+                <span>Tip: Once mounted, the system automatically scans the drive for bootable .iso files to use in the VM wizard.</span>
+                <span class="font-mono">Driver: lsusb & lsblk helpers</span>
             </div>
         </div>
 
