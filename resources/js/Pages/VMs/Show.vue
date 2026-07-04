@@ -150,6 +150,7 @@ const editForm = useForm({
     network_model: props.vm.network_model || 'virtio',
     description: props.vm.description || '',
     usb_controller: props.vm.usb_controller !== false,
+    usb_controller_model: props.vm.usb_controller_model || 'qemu-xhci',
     iso_volume: props.vm.iso_volume || '',
 });
 
@@ -878,14 +879,28 @@ const getStatusColor = (status) => {
                     </div>
 
                     <!-- USB Controller -->
-                    <div class="flex items-center space-x-2 pt-1">
-                        <input
-                            v-model="editForm.usb_controller"
-                            type="checkbox"
-                            id="edit_usb_controller"
-                            class="rounded bg-[#111214] border-[#2c2d30] text-[#e57300] focus:ring-[#e57300] focus:ring-opacity-50"
-                        />
-                        <label for="edit_usb_controller" class="text-gray-300 font-semibold cursor-pointer">Enable USB Controller</label>
+                    <div class="flex flex-col md:flex-row md:items-center gap-4 pt-1">
+                        <div class="flex items-center space-x-2">
+                            <input
+                                v-model="editForm.usb_controller"
+                                type="checkbox"
+                                id="edit_usb_controller"
+                                class="rounded bg-[#111214] border-[#2c2d30] text-[#e57300] focus:ring-[#e57300] focus:ring-opacity-50"
+                            />
+                            <label for="edit_usb_controller" class="text-gray-300 font-semibold cursor-pointer">Enable USB Controller</label>
+                        </div>
+                        
+                        <div v-if="editForm.usb_controller" class="flex items-center space-x-2 text-xs">
+                            <label class="text-gray-400 font-semibold shrink-0">USB Controller Model:</label>
+                            <select
+                                v-model="editForm.usb_controller_model"
+                                class="bg-[#111214] border border-[#2c2d30] rounded p-1.5 text-white focus:outline-none focus:border-[#e57300] text-xs"
+                            >
+                                <option value="qemu-xhci">USB 3.0 (qemu-xhci - Win 10/11, Linux)</option>
+                                <option value="ich9-ehci1">USB 2.0 (ich9-ehci1 - Win 7/XP)</option>
+                                <option value="piix3-uhci">USB 1.1 (piix3-uhci - Legacy)</option>
+                            </select>
+                        </div>
                     </div>
 
                     <!-- Actions -->

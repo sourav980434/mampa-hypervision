@@ -99,6 +99,7 @@ const wizardForm = ref({
     iso_volume: '',
     description: '',
     usb_controller: true,
+    usb_controller_model: 'qemu-xhci',
     start_after_created: false,
     mac_address: ''
 });
@@ -136,6 +137,7 @@ const closeWizardModal = () => {
         iso_volume: '',
         description: '',
         usb_controller: true,
+        usb_controller_model: 'qemu-xhci',
         start_after_created: false,
         mac_address: ''
     };
@@ -708,9 +710,22 @@ const submitWizard = async () => {
                         </div>
 
                         <div class="grid grid-cols-2 gap-4">
-                            <div class="flex items-center space-x-2.5 bg-black/10 p-2.5 rounded border border-[#2c2d30]">
-                                <input v-model="wizardForm.usb_controller" type="checkbox" id="usb_controller" class="rounded text-[#e57300] focus:ring-[#e57300] bg-black border-gray-700" />
-                                <label for="usb_controller" class="text-gray-300 cursor-pointer">Add USB Tablet / Keyboard</label>
+                            <div class="flex flex-col bg-black/10 p-2.5 rounded border border-[#2c2d30] space-y-2">
+                                <div class="flex items-center space-x-2.5">
+                                    <input v-model="wizardForm.usb_controller" type="checkbox" id="usb_controller" class="rounded text-[#e57300] focus:ring-[#e57300] bg-black border-gray-700" />
+                                    <label for="usb_controller" class="text-gray-300 cursor-pointer">Add USB Tablet / Keyboard</label>
+                                </div>
+                                <div v-if="wizardForm.usb_controller" class="space-y-1">
+                                    <label class="block text-[10px] text-gray-400 font-semibold uppercase">USB Controller Model</label>
+                                    <select 
+                                        v-model="wizardForm.usb_controller_model"
+                                        class="w-full bg-[#111214] border border-[#2c2d30] rounded p-1.5 text-white focus:outline-none focus:border-[#e57300] text-xs"
+                                    >
+                                        <option value="qemu-xhci">USB 3.0 (qemu-xhci - Win 10/11, Linux)</option>
+                                        <option value="ich9-ehci1">USB 2.0 (ich9-ehci1 - Win 7/XP)</option>
+                                        <option value="piix3-uhci">USB 1.1 (piix3-uhci - Legacy)</option>
+                                    </select>
+                                </div>
                             </div>
                             <div class="flex items-center space-x-2.5 bg-black/10 p-2.5 rounded border border-[#2c2d30] opacity-50 cursor-not-allowed">
                                 <input type="checkbox" id="tpm_controller" class="rounded bg-black border-gray-700" disabled />

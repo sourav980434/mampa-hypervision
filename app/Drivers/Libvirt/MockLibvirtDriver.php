@@ -279,10 +279,14 @@ XML;
         }
 
         $usbController = false;
+        $usbControllerModel = 'qemu-xhci';
         if (isset($xml->devices->controller)) {
             foreach ($xml->devices->controller as $ctrl) {
                 if ((string)$ctrl['type'] === 'usb') {
                     $usbController = true;
+                    if (isset($ctrl['model'])) {
+                        $usbControllerModel = (string)$ctrl['model'];
+                    }
                     break;
                 }
             }
@@ -317,6 +321,7 @@ XML;
             'network_bridge' => $networkBridge,
             'network_model' => $networkModel,
             'usb_controller' => $usbController,
+            'usb_controller_model' => $usbControllerModel,
             'iso_volume' => $isoVolume,
         ];
 

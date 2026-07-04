@@ -264,7 +264,12 @@ class VMService
 
         $usbXml = "";
         if (!empty($params['usb_controller'])) {
-            $usbXml = "\n    <controller type='usb' index='0' model='qemu-xhci' ports='15'/>";
+            $usbModel = htmlspecialchars($params['usb_controller_model'] ?? 'qemu-xhci', ENT_QUOTES);
+            if ($usbModel === 'qemu-xhci') {
+                $usbXml = "\n    <controller type='usb' index='0' model='qemu-xhci' ports='15'/>";
+            } else {
+                $usbXml = "\n    <controller type='usb' index='0' model='{$usbModel}'/>";
+            }
         }
 
         $description = htmlspecialchars($params['description'] ?? 'Created via Mampa Hypervisor VM Wizard.', ENT_QUOTES);
