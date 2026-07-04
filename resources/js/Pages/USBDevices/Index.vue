@@ -2,6 +2,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, usePage } from '@inertiajs/vue3';
 import { ref, onMounted, onUnmounted, computed } from 'vue';
+import axios from 'axios';
 
 const page = usePage();
 const user = computed(() => page.props.auth.user);
@@ -40,15 +41,13 @@ const addToast = (message, type = 'success') => {
 const fetchDevices = async (showLoading = false) => {
     if (showLoading) isLoading.value = true;
     try {
-        const response = await fetch('/api/usb/devices');
-        if (response.ok) {
-            const data = await response.json();
-            
-            // Detect if any USB device was plugged in or removed
-            detectHotplugChanges(data);
-            
-            devices.value = data;
-        }
+        const response = await axios.get('/api/usb/devices');
+        const data = response.data;
+        
+        // Detect if any USB device was plugged in or removed
+        detectHotplugChanges(data);
+        
+        devices.value = data;
     } catch (e) {
         console.error("Failed to fetch USB devices", e);
     } finally {
@@ -59,10 +58,8 @@ const fetchDevices = async (showLoading = false) => {
 // Fetch current attachment status
 const fetchAttachedState = async () => {
     try {
-        const response = await fetch('/api/usb/attached');
-        if (response.ok) {
-            attachedState.value = await response.json();
-        }
+        const response = await axios.get('/api/usb/attached');
+        attachedState.value = response.data;
     } catch (e) {
         console.error("Failed to fetch attached USB states", e);
     }
@@ -116,11 +113,6 @@ const closeAttachModal = () => {
     selectedVmUuid.value = '';
 };
 
-// Check CSRF token for requests
-const getCsrfToken = () => {
-    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-};
-
 // Handle attach command
 const handleAttach = async () => {
     if (!selectedDevice.value || !selectedVmUuid.value) return;
@@ -130,29 +122,22 @@ const handleAttach = async () => {
     isAttachModalOpen.value = false;
 
     try {
-        const response = await fetch('/api/usb/attach', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': getCsrfToken(),
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({
-                vm_uuid: selectedVmUuid.value,
-                vendor_id: selectedDevice.value.vendor_id,
-                product_id: selectedDevice.value.product_id
-            })
+        const response = await axios.post('/api/usb/attach', {
+            vm_uuid: selectedVmUuid.value,
+            vendor_id: selectedDevice.value.vendor_id,
+            product_id: selectedDevice.value.product_id
         });
 
-        const result = await response.json();
-        if (response.ok && result.success) {
+        const result = response.data;
+        if (result.success) {
             addToast(result.message || 'USB attached successfully.', 'success');
             await refreshData();
         } else {
             addToast(result.message || 'Failed to attach USB.', 'error');
         }
     } catch (e) {
-        addToast('Network error during USB attachment.', 'error');
+        const errorMsg = e.response?.data?.message || 'Network error during USB attachment.';
+        addToast(errorMsg, 'error');
     } finally {
         delete isActionLoading.value[key];
         closeAttachModal();
@@ -174,29 +159,22 @@ const handleDetach = async (device) => {
     isActionLoading.value[key] = true;
 
     try {
-        const response = await fetch('/api/usb/detach', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': getCsrfToken(),
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({
-                vm_uuid: attachedVm.vm_uuid,
-                vendor_id: device.vendor_id,
-                product_id: device.product_id
-            })
+        const response = await axios.post('/api/usb/detach', {
+            vm_uuid: attachedVm.vm_uuid,
+            vendor_id: device.vendor_id,
+            product_id: device.product_id
         });
 
-        const result = await response.json();
-        if (response.ok && result.success) {
+        const result = response.data;
+        if (result.success) {
             addToast(result.message || 'USB detached successfully.', 'success');
             await refreshData();
         } else {
             addToast(result.message || 'Failed to detach USB.', 'error');
         }
     } catch (e) {
-        addToast('Network error during USB detachment.', 'error');
+        const errorMsg = e.response?.data?.message || 'Network error during USB detachment.';
+        addToast(errorMsg, 'error');
     } finally {
         delete isActionLoading.value[key];
     }
