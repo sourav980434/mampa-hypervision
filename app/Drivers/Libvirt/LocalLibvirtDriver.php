@@ -143,6 +143,7 @@ class LocalLibvirtDriver implements LibvirtDriver
             'network_bridge' => $xmlData['network_bridge'] ?? 'virbr0',
             'network_model' => $xmlData['network_model'] ?? 'virtio',
             'usb_controller' => $xmlData['usb_controller'] ?? false,
+            'iso_volume' => $xmlData['iso_volume'] ?? '',
         ];
     }
 
@@ -283,14 +284,19 @@ class LocalLibvirtDriver implements LibvirtDriver
                     $diskSource = (string) $disk->source['file'];
                     $diskSizeGb = (int) $disk['size'] ?: 20;
                     
-                    if ($diskSource && !file_exists($diskSource)) {
-                        $diskRes = $this->runCommand("sudo qemu-img create -f qcow2 " . escapeshellarg($diskSource) . " " . $diskSizeGb . "G");
-                        if ($diskRes['exit_code'] !== 0) {
-                            throw new \RuntimeException("Failed to create disk image for VM {$name}: " . $diskRes['error']);
+                    if ($diskSource) {
+                        if (!file_exists($diskSource)) {
+                            $diskRes = $this->runCommand("sudo qemu-img create -f qcow2 " . escapeshellarg($diskSource) . " " . $diskSizeGb . "G");
+                            if ($diskRes['exit_code'] !== 0) {
+                                throw new \RuntimeException("Failed to create disk image for VM {$name}: " . $diskRes['error']);
+                            }
+                            // Ensure libvirt-qemu has write access to the newly created disk image
+                            $this->runCommand("sudo chown libvirt-qemu:libvirt-qemu " . escapeshellarg($diskSource));
+                            $this->runCommand("sudo chmod 660 " . escapeshellarg($diskSource));
+                        } else {
+                            // If disk exists, resize it (growing is safe)
+                            $this->runCommand("sudo qemu-img resize " . escapeshellarg($diskSource) . " " . $diskSizeGb . "G");
                         }
-                        // Ensure libvirt-qemu has write access to the newly created disk image
-                        $this->runCommand("sudo chown libvirt-qemu:libvirt-qemu " . escapeshellarg($diskSource));
-                        $this->runCommand("sudo chmod 660 " . escapeshellarg($diskSource));
                     }
                 }
             }
@@ -622,6 +628,17 @@ class LocalLibvirtDriver implements LibvirtDriver
             }
         }
 
+        $isoVolume = '';
+        if (isset($xml->devices->disk)) {
+            foreach ($xml->devices->disk as $disk) {
+                if ((string)$disk['device'] === 'cdrom' && isset($disk->source)) {
+                    $isoPath = (string) $disk->source['file'];
+                    $isoVolume = basename($isoPath);
+                    break;
+                }
+            }
+        }
+
         return [
             'mac_address' => $mac,
             'vnc_port' => $vncPort,
@@ -633,6 +650,7 @@ class LocalLibvirtDriver implements LibvirtDriver
             'network_bridge' => $networkBridge,
             'network_model' => $networkModel,
             'usb_controller' => $usbController,
+            'iso_volume' => $isoVolume,
         ];
     }
 

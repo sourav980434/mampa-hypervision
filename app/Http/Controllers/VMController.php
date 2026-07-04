@@ -204,6 +204,7 @@ class VMController extends Controller
             'disk_bus' => 'required|in:virtio,sata,scsi,ide',
             'network_bridge' => 'required|string|max:50',
             'network_model' => 'required|in:virtio,e1000,rtl8139',
+            'iso_volume' => 'nullable|string|max:100',
             'description' => 'nullable|string|max:255',
             'usb_controller' => 'boolean',
         ]);

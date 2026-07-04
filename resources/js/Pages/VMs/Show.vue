@@ -64,9 +64,23 @@ const fetchStats = async () => {
     }
 };
 
+const availableISOs = ref([]);
+
+const fetchISOs = async () => {
+    try {
+        const response = await fetch('/api/storage/isos');
+        if (response.ok) {
+            availableISOs.value = await response.json();
+        }
+    } catch (e) {
+        console.error("Failed to load ISOs", e);
+    }
+};
+
 onMounted(() => {
     fetchStats();
     statsInterval = setInterval(fetchStats, 2000);
+    fetchISOs();
 });
 
 onUnmounted(() => {
@@ -136,6 +150,7 @@ const editForm = useForm({
     network_model: props.vm.network_model || 'virtio',
     description: props.vm.description || '',
     usb_controller: props.vm.usb_controller !== false,
+    iso_volume: props.vm.iso_volume || '',
 });
 
 const openEditModal = () => {
@@ -834,6 +849,21 @@ const getStatusColor = (status) => {
                                 <option value="e1000">Intel e1000</option>
                                 <option value="rtl8139">Realtek rtl8139</option>
                             </select>
+                        </div>
+
+                        <!-- ISO Volume (CD-ROM) -->
+                        <div class="col-span-2 space-y-1">
+                            <label class="block text-gray-400 font-semibold">CD-ROM / Boot ISO Media</label>
+                            <select
+                                v-model="editForm.iso_volume"
+                                class="w-full bg-[#111214] border border-[#2c2d30] rounded p-2 text-white focus:outline-none focus:border-[#e57300] text-xs font-mono"
+                            >
+                                <option value="">[ No ISO Mounted / Empty CD-ROM ]</option>
+                                <option v-for="iso in availableISOs" :key="iso" :value="iso">
+                                    {{ iso }}
+                                </option>
+                            </select>
+                            <span v-if="editForm.errors.iso_volume" class="text-rose-500 text-[10px]">{{ editForm.errors.iso_volume }}</span>
                         </div>
                     </div>
 

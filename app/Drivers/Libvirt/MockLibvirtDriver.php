@@ -288,6 +288,17 @@ XML;
             }
         }
 
+        $isoVolume = '';
+        if (isset($xml->devices->disk)) {
+            foreach ($xml->devices->disk as $disk) {
+                if ((string)$disk['device'] === 'cdrom' && isset($disk->source)) {
+                    $isoPath = (string) $disk->source['file'];
+                    $isoVolume = basename($isoPath);
+                    break;
+                }
+            }
+        }
+
         $vms = $this->getStoredVMs();
         $vms[$uuid] = [
             'uuid' => $uuid,
@@ -306,6 +317,7 @@ XML;
             'network_bridge' => $networkBridge,
             'network_model' => $networkModel,
             'usb_controller' => $usbController,
+            'iso_volume' => $isoVolume,
         ];
 
         $this->saveStoredVMs($vms);
