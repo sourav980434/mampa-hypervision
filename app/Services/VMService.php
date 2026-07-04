@@ -249,9 +249,9 @@ class VMService
         
         $bootXml = "";
         if ($bootType === 'uefi') {
-            $bootXml = "\n    <loader readonly='yes' type='pflash'>/usr/share/OVMF/OVMF_CODE.fd</loader>\n    <nvram>/var/lib/libvirt/qemu/nvram/{$name}_VARS.fd</nvram>";
+            $bootXml = "\n    <loader readonly='yes' type='pflash'>/usr/share/OVMF/OVMF_CODE.fd</loader>\n    <nvram>/var/lib/libvirt/qemu/nvram/{$name}_VARS.fd</nvram>\n    <boot dev='cdrom'/>\n    <boot dev='hd'/>";
         } else {
-            $bootXml = "\n    <boot dev='hd'/>\n    <boot dev='cdrom'/>";
+            $bootXml = "\n    <boot dev='cdrom'/>\n    <boot dev='hd'/>";
         }
 
         $isoXml = "";
