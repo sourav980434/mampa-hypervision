@@ -543,7 +543,7 @@ const getStatusColor = (status) => {
                             </tr>
                             <tr>
                                 <td class="py-2.5 pr-4 font-semibold text-gray-200">Network Interface</td>
-                                <td class="py-2.5 pr-4 text-gray-400">Model: virtio, Source: default, MAC: {{ vm.mac_address || 'Not assigned' }}</td>
+                                <td class="py-2.5 pr-4 text-gray-400">Model: {{ vm.network_model || 'virtio' }}, Source: default, MAC: {{ vm.mac_address || 'Not assigned' }}</td>
                                 <td class="py-2.5 text-right text-gray-500">{{ vm.ip_address || 'dhcp' }}</td>
                             </tr>
                             <tr>
