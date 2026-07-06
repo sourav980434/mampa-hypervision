@@ -40,9 +40,12 @@ class AppServiceProvider extends ServiceProvider
             $driver = env('FIREWALL_DRIVER', 'mock');
             if ($driver === 'iptables') {
                 try {
-                    $test = Process::run('iptables --version');
-                    if ($test->exitCode() === 0) {
-                        return new LocalIptablesFirewallDriver();
+                    $paths = ['iptables', '/sbin/iptables', '/usr/sbin/iptables', '/usr/local/sbin/iptables'];
+                    foreach ($paths as $path) {
+                        $test = Process::run("{$path} --version");
+                        if ($test->exitCode() === 0) {
+                            return new LocalIptablesFirewallDriver();
+                        }
                     }
                 } catch (\Exception $e) {
                     // Failures to execute or check fallback to mock
