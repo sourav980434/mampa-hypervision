@@ -156,6 +156,7 @@ const testConnectivity = async (id) => {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Accept': 'application/json',
                 'X-CSRF-TOKEN': csrfToken
             }
         });
@@ -166,9 +167,18 @@ const testConnectivity = async (id) => {
                 message: data.message
             };
         } else {
+            let errorMsg = 'HTTP error probing target host.';
+            try {
+                const data = await response.json();
+                if (data && data.message) {
+                    errorMsg = data.message;
+                } else if (data && data.error) {
+                    errorMsg = data.error;
+                }
+            } catch (e) {}
             testResults.value[id] = {
                 status: 'failed',
-                message: 'HTTP error probing target host.'
+                message: `${errorMsg} (Status: ${response.status})`
             };
         }
     } catch (e) {

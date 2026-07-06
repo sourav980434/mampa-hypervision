@@ -75,7 +75,7 @@ class PortMappingController extends Controller
             $data = $request->all();
             $plan = $this->networkService->getExecutionPlan($action, $data);
             return response()->json($plan);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
@@ -88,7 +88,7 @@ class PortMappingController extends Controller
         try {
             $this->networkService->reapplyAll();
             return redirect()->route('port-forwarding.index')->with('success', 'All active port forwarding rules re-applied to host firewall.');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return redirect()->route('port-forwarding.index')->with('error', $e->getMessage());
         }
     }
@@ -101,7 +101,7 @@ class PortMappingController extends Controller
         try {
             $result = $this->networkService->testConnectivity($id);
             return response()->json($result);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
