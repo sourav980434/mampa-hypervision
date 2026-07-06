@@ -38,7 +38,7 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(FirewallDriver::class, function ($app) {
             $driver = env('FIREWALL_DRIVER', 'mock');
-            if ($driver === 'iptables') {
+            if ($driver === 'iptables' || $driver === 'local_iptables') {
                 try {
                     $paths = ['iptables', '/sbin/iptables', '/usr/sbin/iptables', '/usr/local/sbin/iptables'];
                     foreach ($paths as $path) {
