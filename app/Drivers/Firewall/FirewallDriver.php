@@ -8,17 +8,19 @@ interface FirewallDriver
 {
     /**
      * Apply a NAT port forwarding rule.
-     * 
-     * @param PortMapping $mapping
-     * @return void
      */
     public function applyPortForward(PortMapping $mapping): void;
 
     /**
      * Remove a NAT port forwarding rule.
-     * 
-     * @param PortMapping $mapping
-     * @return void
      */
     public function removePortForward(PortMapping $mapping): void;
+
+    public function ensureDNATRule(PortMapping $mapping): void;
+
+    public function ensureForwardInboundRule(PortMapping $mapping): void;
+
+    public function ensureForwardReturnRule(PortMapping $mapping): void;
+
+    public function ensureMasqueradeRule(PortMapping $mapping): void;
 }

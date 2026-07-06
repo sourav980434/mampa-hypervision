@@ -44,7 +44,7 @@ class AppServiceProvider extends ServiceProvider
                     foreach ($paths as $path) {
                         $test = Process::run("{$path} --version");
                         if ($test->exitCode() === 0) {
-                            return new LocalIptablesFirewallDriver();
+                            return new LocalIptablesFirewallDriver($app->make(FirewallRuleEngine::class));
                         }
                     }
                 } catch (\Exception $e) {

@@ -235,22 +235,35 @@ class NetworkService
             'destination' => "{$ip}:{$port}"
         ]);
 
-        $errno = 0;
-        $errstr = '';
-        
-        $fp = @fsockopen($ip, $port, $errno, $errstr, 1.5);
-        
-        if ($fp) {
-            fclose($fp);
-            return [
-                'success' => true,
-                'message' => "Successfully connected to {$ip}:{$port}."
-            ];
-        } else {
-            return [
-                'success' => false,
-                'message' => "Connection failed to {$ip}:{$port}. Error: {$errstr} ({$errno})"
-            ];
+        try {
+            $res = \Illuminate\Support\Facades\Process::run("nc -vz -w 2 " . escapeshellarg($ip) . " " . escapeshellarg($port));
+            if ($res->exitCode() === 0) {
+                return [
+                    'success' => true,
+                    'message' => "Firewall OK"
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'message' => "VM service is not listening."
+                ];
+            }
+        } catch (\Throwable $e) {
+            $errno = 0;
+            $errstr = '';
+            $fp = @fsockopen($ip, $port, $errno, $errstr, 1.5);
+            if ($fp) {
+                fclose($fp);
+                return [
+                    'success' => true,
+                    'message' => "Firewall OK"
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'message' => "VM service is not listening."
+                ];
+            }
         }
     }
 

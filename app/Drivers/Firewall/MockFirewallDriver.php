@@ -33,6 +33,30 @@ class MockFirewallDriver implements FirewallDriver
         ]);
     }
 
+    public function ensureDNATRule(PortMapping $mapping): void
+    {
+        $this->checkSafetyMode();
+        Log::info("MockFirewallDriver: Ensuring DNAT rule.", ['mapping_id' => $mapping->id]);
+    }
+
+    public function ensureForwardInboundRule(PortMapping $mapping): void
+    {
+        $this->checkSafetyMode();
+        Log::info("MockFirewallDriver: Ensuring Forward Inbound rule.", ['mapping_id' => $mapping->id]);
+    }
+
+    public function ensureForwardReturnRule(PortMapping $mapping): void
+    {
+        $this->checkSafetyMode();
+        Log::info("MockFirewallDriver: Ensuring Forward Return rule.", ['mapping_id' => $mapping->id]);
+    }
+
+    public function ensureMasqueradeRule(PortMapping $mapping): void
+    {
+        $this->checkSafetyMode();
+        Log::info("MockFirewallDriver: Ensuring Masquerade rule.", ['mapping_id' => $mapping->id]);
+    }
+
     /**
      * Check safety mode config.
      */

@@ -3,11 +3,17 @@
 namespace App\Drivers\Firewall;
 
 use App\Models\PortMapping;
-use Illuminate\Support\Facades\Process;
-use Illuminate\Support\Facades\Log;
+use App\Services\Firewall\FirewallRuleEngine;
 
 class LocalIptablesFirewallDriver implements FirewallDriver
 {
+    protected FirewallRuleEngine $engine;
+
+    public function __construct(FirewallRuleEngine $engine)
+    {
+        $this->engine = $engine;
+    }
+
     /**
      * Check if safety mode blocks this command.
      */
@@ -24,19 +30,7 @@ class LocalIptablesFirewallDriver implements FirewallDriver
     public function applyPortForward(PortMapping $mapping): void
     {
         $this->checkSafetyMode();
-
-        $proto = $mapping->protocol;
-        $pubPort = (int) $mapping->public_port;
-        $intIp = $mapping->internal_ip;
-        $intPort = (int) $mapping->internal_port;
-
-        $cmd1 = "sudo iptables -t nat -A PREROUTING -p {$proto} --dport {$pubPort} -j DNAT --to-destination {$intIp}:{$intPort}";
-        $cmd2 = "sudo iptables -A FORWARD -p {$proto} -d {$intIp} --dport {$intPort} -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT";
-        $cmd3 = "sudo iptables -t nat -A POSTROUTING -p {$proto} -d {$intIp} --dport {$intPort} -j MASQUERADE";
-
-        $this->runCommand($cmd1);
-        $this->runCommand($cmd2);
-        $this->runCommand($cmd3);
+        $this->engine->applyMapping($mapping);
     }
 
     /**
@@ -45,30 +39,30 @@ class LocalIptablesFirewallDriver implements FirewallDriver
     public function removePortForward(PortMapping $mapping): void
     {
         $this->checkSafetyMode();
-
-        $proto = $mapping->protocol;
-        $pubPort = (int) $mapping->public_port;
-        $intIp = $mapping->internal_ip;
-        $intPort = (int) $mapping->internal_port;
-
-        $cmd1 = "sudo iptables -t nat -D PREROUTING -p {$proto} --dport {$pubPort} -j DNAT --to-destination {$intIp}:{$intPort}";
-        $cmd2 = "sudo iptables -D FORWARD -p {$proto} -d {$intIp} --dport {$intPort} -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT";
-        $cmd3 = "sudo iptables -t nat -D POSTROUTING -p {$proto} -d {$intIp} --dport {$intPort} -j MASQUERADE";
-
-        // Try deleting, ignore if rules don't exist
-        $this->runCommand($cmd1, false);
-        $this->runCommand($cmd2, false);
-        $this->runCommand($cmd3, false);
+        $this->engine->removeMapping($mapping);
     }
 
-    /**
-     * Helper to run commands.
-     */
-    protected function runCommand(string $cmd, bool $throwOnError = true): void
+    public function ensureDNATRule(PortMapping $mapping): void
     {
-        $res = Process::run($cmd);
-        if ($res->exitCode() !== 0 && $throwOnError) {
-            throw new \RuntimeException("Firewall command failed: {$cmd}. Error: " . $res->errorOutput());
-        }
+        $this->checkSafetyMode();
+        $this->engine->ensureDNATRule($mapping);
+    }
+
+    public function ensureForwardInboundRule(PortMapping $mapping): void
+    {
+        $this->checkSafetyMode();
+        $this->engine->ensureForwardInboundRule($mapping);
+    }
+
+    public function ensureForwardReturnRule(PortMapping $mapping): void
+    {
+        $this->checkSafetyMode();
+        $this->engine->ensureForwardReturnRule($mapping);
+    }
+
+    public function ensureMasqueradeRule(PortMapping $mapping): void
+    {
+        $this->checkSafetyMode();
+        $this->engine->ensureMasqueradeRule($mapping);
     }
 }
